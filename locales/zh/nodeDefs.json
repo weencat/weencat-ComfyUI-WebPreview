@@ -1,0 +1,71 @@
+{
+  "WebLiveSamplerNode": {
+    "display_name": "Web实时K采样器",
+    "inputs": {
+      "model": {
+        "name": "模型"
+      },
+      "seed": {
+        "name": "随机种"
+      },
+      "steps": {
+        "name": "步数"
+      },
+      "cfg": {
+        "name": "CFG"
+      },
+      "sampler_name": {
+        "name": "采样器"
+      },
+      "scheduler": {
+        "name": "调度器"
+      },
+      "positive": {
+        "name": "正向提示词"
+      },
+      "negative": {
+        "name": "负向提示词"
+      },
+      "latent_image": {
+        "name": "Latent图像"
+      },
+      "denoise": {
+        "name": "降噪幅度"
+      },
+      "preview_rate": {
+        "name": "预览频率"
+      },
+      "vae": {
+        "name": "VAE"
+      }
+    }
+  },
+  "WebPreviewNode": {
+    "display_name": "Web预览节点",
+    "inputs": {
+      "images": {
+        "name": "图像"
+      },
+      "image_name": {
+        "name": "图像名称"
+      },
+      "positive_override": {
+        "name": "正向提示词覆盖"
+      },
+      "negative_override": {
+        "name": "负向提示词覆盖"
+      },
+      "prompt": {
+        "name": "提示词"
+      },
+      "extra_pnginfo": {
+        "name": "额外PNG信息"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像"
+      }
+    }
+  }
+}

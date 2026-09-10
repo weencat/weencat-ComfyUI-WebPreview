@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI Viewer</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            background-color: #0d0d10; color: #e4e4e7; margin: 0; padding: 15px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+        }
+
+        .control-panel {
+            background-color: #18181b; border: 1px solid #27272a; border-radius: 8px;
+            padding: 10px 16px; width: 100%; max-width: 1400px; margin-bottom: 15px;
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 10;
+        }
+        .control-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        .select-wrapper {
+            display: flex; align-items: center; gap: 6px; background-color: #27272a;
+            border: 1px solid #3f3f46; border-radius: 6px; padding: 3px 8px;
+        }
+        .select-label { font-size: 11px; font-weight: bold; color: #fbbf24; }
+        .styled-select {
+            background: transparent; color: #ffffff; border: none; font-size: 12px;
+            font-weight: 500; outline: none; cursor: pointer; padding: 3px 4px;
+        }
+        .styled-select option { background-color: #18181b; color: #ffffff; }
+
+        button {
+            background-color: #2563eb; color: white; border: none; padding: 6px 12px;
+            border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500;
+        }
+        button:hover { opacity: 0.9; }
+        button.btn-green { background-color: #059669; }
+        button.btn-gray { background-color: #3f3f46; }
+        
+        .btn-group { display: flex; border: 1px solid #3f3f46; border-radius: 6px; overflow: hidden; }
+        .btn-group button { background-color: #27272a; color: #a1a1aa; border-radius: 0; border: none; padding: 6px 10px; }
+        .btn-group button.active { background-color: #3b82f6; color: white; }
+
+        .content-container { width: 100%; max-width: 1400px; display: flex; gap: 15px; transition: all 0.2s ease; justify-content: center; }
+        .layout-vertical { flex-direction: column; align-items: center; }
+        .layout-horizontal { flex-direction: row; align-items: flex-start; }
+
+        .image-box {
+            background-color: #18181b; border: 1px solid #27272a; border-radius: 8px;
+            padding: 12px; display: flex; flex-direction: column; align-items: center; position: relative; min-height: 300px;
+            width: 100%; max-width: 900px;
+        }
+
+        .progress-container {
+            width: 100%; background-color: #27272a; border-radius: 6px; overflow: hidden;
+            margin-bottom: 10px; border: 1px solid #3f3f46; display: flex; flex-direction: column; position: relative;
+        }
+        .progress-bar-bg { width: 100%; height: 8px; background: #1f1f23; position: relative; }
+        .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.15s ease-out; }
+        .progress-info {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 4px 8px; font-size: 11px; color: #a1a1aa; font-family: monospace;
+        }
+        .progress-status-badge { color: #60a5fa; font-weight: bold; }
+
+        .image-viewport {
+            width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center;
+            position: relative; border-radius: 6px; cursor: crosshair;
+        }
+        .img-container { position: relative; display: inline-block; }
+        img#previewImg { max-width: 100%; max-height: 750px; object-fit: contain; border-radius: 6px; display: none; }
+
+        .magnifier-lens {
+            position: absolute; border: 2px solid #3b82f6; border-radius: 50%;
+            pointer-events: none; display: none; box-shadow: 0 0 12px rgba(0,0,0,0.85);
+            background-repeat: no-repeat; z-index: 50;
+        }
+        .aim-box {
+            position: absolute; border: 1px solid #60a5fa; background: rgba(59, 130, 246, 0.25);
+            pointer-events: none; display: none; z-index: 45; border-radius: 3px;
+        }
+        .external-magnifier-box {
+            position: fixed; border: 2px solid #3b82f6; border-radius: 8px;
+            background-color: #18181b; box-shadow: 0 12px 36px rgba(0,0,0,0.95);
+            background-repeat: no-repeat; display: none; z-index: 999; pointer-events: none;
+        }
+
+        .meta-box { 
+            background-color: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 14px; display: none;
+            width: 100%; max-width: 900px; font-size: 12px;
+        }
+        .badges-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .badge { background-color: #27272a; border: 1px solid #3f3f46; border-radius: 4px; padding: 4px 6px; color: #d4d4d8; }
+        .badge b { color: #60a5fa; }
+        .prompt-card { background-color: #09090b; border: 1px solid #27272a; border-radius: 6px; padding: 10px; margin-top: 8px; }
+        .prompt-header { display: flex; justify-content: space-between; font-weight: bold; color: #a1a1aa; margin-bottom: 4px; }
+        .prompt-content { line-height: 1.4; color: #e4e4e7; font-family: monospace; white-space: pre-wrap; word-break: break-word; max-height: 150px; overflow-y: auto; }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #18181b; border: 1px solid #3f3f46; border-radius: 8px; padding: 20px;
+            width: 400px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+        }
+        .modal-title { font-size: 14px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .setting-section-title { font-size: 11px; font-weight: bold; color: #fbbf24; text-transform: uppercase; margin-top: 6px; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .setting-item select, .setting-item input[type="number"] { 
+            background: #27272a; color: white; border: 1px solid #3f3f46; border-radius: 4px; padding: 4px 8px; width: 120px;
+        }
+
+        @media (max-width: 768px) {
+            .layout-horizontal { flex-direction: column !important; align-items: center; }
+            .modal-content { width: 92%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部控制台 -->
+    <div class="control-panel">
+        <div class="control-group">
+            <div class="select-wrapper">
+                <span class="select-label" data-i18n="select_image">切换成图:</span>
+                <select id="imageSlotSelect" class="styled-select">
+                    <option value="" data-i18n="no_images">暂无成图</option>
+                </select>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight: 500;">
+                <input type="checkbox" id="autoRefreshToggle" checked style="cursor:pointer; width:15px; height:15px;">
+                <label for="autoRefreshToggle" data-i18n="auto_poll" style="cursor:pointer;">自动轮询</label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="btn-group">
+                <button id="btnLayoutV" class="active" onclick="setLayout('vertical')" data-i18n="layout_v">上下分布</button>
+                <button id="btnLayoutH" onclick="setLayout('horizontal')" data-i18n="layout_h">左右分布</button>
+            </div>
+            <button id="manualRefreshBtn" data-i18n="refresh">立即刷新</button>
+            <button id="downloadBtn" class="btn-green" data-i18n="download">下载原图</button>
+            <button id="openSettingsBtn" class="btn-gray" data-i18n="settings">⚙ 设置</button>
+        </div>
+    </div>
+
+    <!-- 主体区域 -->
+    <div class="content-container layout-vertical" id="mainContainer">
+        <div class="image-box" id="imageBox">
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressStatusText" class="progress-status-badge">Ready</span>
+                    <span id="progressStepText">0/0 (0%)</span>
+                </div>
+            </div>
+
+            <div id="statusText" style="color:#71717a; font-size:13px;" data-i18n="waiting">等待 ComfyUI 生图...</div>
+            
+            <div class="image-viewport" id="imageViewport">
+                <div class="img-container" id="imgContainer">
+                    <img id="previewImg" src="" alt="Live Preview"/>
+                </div>
+                <div id="magnifierLens" class="magnifier-lens"></div>
+                <div id="aimBox" class="aim-box"></div>
+            </div>
+        </div>
+
+        <div class="meta-box" id="metaBox">
+            <div class="badges-grid" id="badgesContainer"></div>
+
+            <div class="prompt-card" id="posCard" style="display:none;">
+                <div class="prompt-header">
+                    <span data-i18n="pos_prompt">Positive Prompt</span>
+                    <button onclick="copyPrompt('posText')" style="padding:2px 6px; font-size:10px;" data-i18n="copy">复制</button>
+                </div>
+                <div class="prompt-content" id="posText"></div>
+            </div>
+
+            <div class="prompt-card" id="negCard" style="display:none; border-color:#450a0a;">
+                <div class="prompt-header" style="color:#f87171;">
+                    <span data-i18n="neg_prompt">Negative Prompt</span>
+                    <button onclick="copyPrompt('negText')" style="padding:2px 6px; font-size:10px;" data-i18n="copy">复制</button>
+                </div>
+                <div class="prompt-content" id="negText"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="externalMagnifierBox" class="external-magnifier-box"></div>
+
+    <!-- 设置弹窗 -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span data-i18n="settings">设置</span>
+                <span style="cursor:pointer;" onclick="toggleModal(false)">✕</span>
+            </div>
+
+            <div class="setting-item">
+                <label data-i18n="lang_select">语言</label>
+                <select id="langSelect" onchange="setLanguage(this.value)">
+                    <option value="zh_cn">简体中文</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label data-i18n="show_image">显示图像区域</label>
+                <input type="checkbox" id="showImageCheck" checked onchange="updateVisibility()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="show_meta">显示元数据区域</label>
+                <input type="checkbox" id="showMetaCheck" checked onchange="updateVisibility()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="show_progress">显示采样进度条与状态</label>
+                <input type="checkbox" id="showProgressCheck" checked onchange="updateVisibility()">
+            </div>
+
+            <div class="setting-section-title">📐 尺寸与排版自定义</div>
+            <div class="setting-item">
+                <label data-i18n="img_box_width">图片框最大宽度</label>
+                <input type="number" id="imgBoxWidth" min="200" max="2560" step="50" value="900" onchange="applyCustomDimensions()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="img_max_height">图片最大高度</label>
+                <input type="number" id="imgMaxHeight" min="200" max="2560" step="50" value="750" onchange="applyCustomDimensions()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="meta_box_width">元数据框最大宽度</label>
+                <input type="number" id="metaBoxWidth" min="200" max="2560" step="50" value="900" onchange="applyCustomDimensions()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="meta_font_size">元数据字体大小</label>
+                <input type="number" id="metaFontSize" min="10" max="24" step="1" value="12" onchange="applyCustomDimensions()">
+            </div>
+
+            <div class="setting-section-title">🔍 放大镜高级选项</div>
+            <div class="setting-item">
+                <label data-i18n="magnifier_enable">启用悬浮放大镜</label>
+                <input type="checkbox" id="magnifierCheck" onchange="saveSettings()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="mag_mode">放大镜模式</label>
+                <select id="magModeSelect" onchange="saveSettings()">
+                    <option value="inside" data-i18n="mag_mode_inside">图片内透镜跟随</option>
+                    <option value="outside" data-i18n="mag_mode_outside">独立外侧视窗</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label data-i18n="magnifier_zoom">放大倍率</label>
+                <input type="number" id="magnifierZoom" min="1.1" max="10.0" step="0.1" value="2.5" onchange="saveSettings()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="magnifier_size">透镜/视窗尺寸 (px)</label>
+                <input type="number" id="magnifierSize" min="100" max="800" step="10" value="280" onchange="saveSettings()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="mag_offset_x">视窗 X 轴偏移 (px)</label>
+                <input type="number" id="magOffsetX" min="-1000" max="2000" step="5" value="15" onchange="saveSettings()">
+            </div>
+            <div class="setting-item">
+                <label data-i18n="mag_offset_y">视窗 Y 轴偏移 (px)</label>
+                <input type="number" id="magOffsetY" min="-1000" max="2000" step="5" value="0" onchange="saveSettings()">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. i18n 多语言引擎 ---
+        let currentLang = localStorage.getItem('viewer_lang') || 'zh_cn';
+        let i18nDict = {};
+
+        async function loadI18n(lang) {
+            try {
+                const res = await fetch(`/web_preview/locales/${lang}`);
+                if (res.ok) {
+                    i18nDict = await res.json();
+                    applyI18n();
+                }
+            } catch (e) { console.error("i18n err:", e); }
+        }
+
+        function t(key) { return i18nDict[key] || key; }
+
+        function applyI18n() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18nDict[key]) el.innerText = i18nDict[key];
+            });
+            document.title = t('title') + (currentActiveImage ? ` [${currentActiveImage}]` : '');
+            document.getElementById('langSelect').value = currentLang;
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('viewer_lang', lang);
+            loadI18n(lang);
+        }
+
+        // --- 2. 状态管理 ---
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentActiveImage = urlParams.get('path') || '';
+        let knownImages = [];
+
+        const imageSlotSelect = document.getElementById('imageSlotSelect');
+
+        imageSlotSelect.addEventListener('change', (e) => {
+            currentActiveImage = e.target.value;
+            triggerPollNow();
+        });
+
+        // 动态同步后台现有全部成图名称
+        async function syncImageSlots() {
+            try {
+                const res = await fetch('/web_preview/channels?t=' + Date.now());
+                if (!res.ok) return;
+                const data = await res.json();
+                const images = data.channels || [];
+
+                if (JSON.stringify(images) !== JSON.stringify(knownImages)) {
+                    knownImages = images;
+                    imageSlotSelect.innerHTML = '';
+
+                    if (images.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.innerText = t('no_images');
+                        imageSlotSelect.appendChild(opt);
+                        currentActiveImage = '';
+                    } else {
+                        images.forEach(imgName => {
+                            const opt = document.createElement('option');
+                            opt.value = imgName;
+                            opt.innerText = imgName;
+                            imageSlotSelect.appendChild(opt);
+                        });
+
+                        // 如果当前未选中或选中的不在列表中，默认选中最后一个活跃槽位
+                        if (!currentActiveImage || !images.includes(currentActiveImage)) {
+                            currentActiveImage = images[images.length - 1];
+                        }
+                        imageSlotSelect.value = currentActiveImage;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        const mainContainer = document.getElementById('mainContainer');
+        const imageBox = document.getElementById('imageBox');
+        const metaBox = document.getElementById('metaBox');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressStatusText = document.getElementById('progressStatusText');
+        const progressStepText = document.getElementById('progressStepText');
+
+        const previewImg = document.getElementById('previewImg');
+        const viewport = document.getElementById('imageViewport');
+        const statusText = document.getElementById('statusText');
+        const lens = document.getElementById('magnifierLens');
+        const aimBox = document.getElementById('aimBox');
+        const extBox = document.getElementById('externalMagnifierBox');
+
+        // --- 3. 尺寸与字体响应管理 ---
+        function applyCustomDimensions() {
+            const imgW = document.getElementById('imgBoxWidth').value || 900;
+            const imgH = document.getElementById('imgMaxHeight').value || 750;
+            const metaW = document.getElementById('metaBoxWidth').value || 900;
+            const fontSize = document.getElementById('metaFontSize').value || 12;
+
+            imageBox.style.maxWidth = imgW + 'px';
+            previewImg.style.maxHeight = imgH + 'px';
+
+            metaBox.style.maxWidth = metaW + 'px';
+            metaBox.style.fontSize = fontSize + 'px';
+
+            document.querySelectorAll('.badge').forEach(b => b.style.fontSize = (fontSize - 1) + 'px');
+            document.querySelectorAll('.prompt-content').forEach(p => p.style.fontSize = fontSize + 'px');
+            document.querySelectorAll('.prompt-header').forEach(h => h.style.fontSize = (fontSize - 1) + 'px');
+
+            localStorage.setItem('viewer_img_box_w', imgW);
+            localStorage.setItem('viewer_img_max_h', imgH);
+            localStorage.setItem('viewer_meta_box_w', metaW);
+            localStorage.setItem('viewer_meta_font_size', fontSize);
+        }
+
+        // --- 4. 布局与显隐控制 ---
+        function setLayout(mode) {
+            mainContainer.className = (mode === 'horizontal') ? 'content-container layout-horizontal' : 'content-container layout-vertical';
+            document.getElementById('btnLayoutH').classList.toggle('active', mode === 'horizontal');
+            document.getElementById('btnLayoutV').classList.toggle('active', mode === 'vertical');
+            localStorage.setItem('viewer_layout_mode', mode);
+        }
+        setLayout(localStorage.getItem('viewer_layout_mode') || 'vertical');
+
+        function updateVisibility() {
+            const showImg = document.getElementById('showImageCheck').checked;
+            const showMeta = document.getElementById('showMetaCheck').checked;
+            const showProgress = document.getElementById('showProgressCheck').checked;
+
+            imageBox.style.display = showImg ? 'flex' : 'none';
+            metaBox.style.display = (showMeta && previewImg.style.display !== 'none') ? 'block' : 'none';
+            progressContainer.style.display = showProgress ? 'flex' : 'none';
+
+            localStorage.setItem('viewer_show_img', showImg);
+            localStorage.setItem('viewer_show_meta', showMeta);
+            localStorage.setItem('viewer_show_progress', showProgress);
+        }
+
+        function toggleModal(show) {
+            document.getElementById('settingsModal').style.display = show ? 'flex' : 'none';
+        }
+        document.getElementById('openSettingsBtn').addEventListener('click', () => toggleModal(true));
+
+        // --- 5. 放大镜核心逻辑 ---
+        function hideMagnifiers() {
+            lens.style.display = 'none';
+            aimBox.style.display = 'none';
+            extBox.style.display = 'none';
+        }
+
+        function saveSettings() {
+            localStorage.setItem('viewer_mag_enabled', document.getElementById('magnifierCheck').checked);
+            localStorage.setItem('viewer_mag_mode', document.getElementById('magModeSelect').value);
+            localStorage.setItem('viewer_mag_zoom', document.getElementById('magnifierZoom').value);
+            localStorage.setItem('viewer_mag_size', document.getElementById('magnifierSize').value);
+            localStorage.setItem('viewer_mag_offset_x', document.getElementById('magOffsetX').value);
+            localStorage.setItem('viewer_mag_offset_y', document.getElementById('magOffsetY').value);
+        }
+
+        viewport.addEventListener('mousemove', (e) => {
+            const enabled = document.getElementById('magnifierCheck').checked;
+            if (!enabled || previewImg.style.display === 'none' || !previewImg.src) {
+                hideMagnifiers();
+                return;
+            }
+
+            const imgRect = previewImg.getBoundingClientRect();
+            const vpRect = viewport.getBoundingClientRect();
+            const boxRect = imageBox.getBoundingClientRect();
+
+            const relX = e.clientX - imgRect.left;
+            const relY = e.clientY - imgRect.top;
+
+            if (relX < 0 || relY < 0 || relX > imgRect.width || relY > imgRect.height) {
+                hideMagnifiers();
+                return;
+            }
+
+            const ratioX = relX / imgRect.width;
+            const ratioY = relY / imgRect.height;
+
+            const zoom = parseFloat(document.getElementById('magnifierZoom').value) || 2.5;
+            const size = parseInt(document.getElementById('magnifierSize').value) || 280;
+            const offsetX = parseInt(document.getElementById('magOffsetX').value) || 15;
+            const offsetY = parseInt(document.getElementById('magOffsetY').value) || 0;
+            const mode = document.getElementById('magModeSelect').value;
+
+            const bgWidth = imgRect.width * zoom;
+            const bgHeight = imgRect.height * zoom;
+
+            if (mode === 'inside') {
+                aimBox.style.display = 'none';
+                extBox.style.display = 'none';
+                lens.style.display = 'block';
+                lens.style.width = size + 'px';
+                lens.style.height = size + 'px';
+
+                lens.style.left = (e.clientX - vpRect.left - size / 2) + 'px';
+                lens.style.top = (e.clientY - vpRect.top - size / 2) + 'px';
+
+                lens.style.backgroundImage = `url('${previewImg.src}')`;
+                lens.style.backgroundSize = `${bgWidth}px ${bgHeight}px`;
+                lens.style.backgroundPosition = `-${ratioX * bgWidth - size / 2}px -${ratioY * bgHeight - size / 2}px`;
+            } else {
+                lens.style.display = 'none';
+                
+                const aimW = size / zoom;
+                const aimH = size / zoom;
+                aimBox.style.display = 'block';
+                aimBox.style.width = aimW + 'px';
+                aimBox.style.height = aimH + 'px';
+                aimBox.style.left = (e.clientX - vpRect.left - aimW / 2) + 'px';
+                aimBox.style.top = (e.clientY - vpRect.top - aimH / 2) + 'px';
+
+                extBox.style.display = 'block';
+                extBox.style.width = size + 'px';
+                extBox.style.height = size + 'px';
+
+                const targetLeft = boxRect.right + offsetX;
+                const targetTop = boxRect.top + offsetY;
+
+                extBox.style.left = targetLeft + 'px';
+                extBox.style.top = targetTop + 'px';
+
+                extBox.style.backgroundImage = `url('${previewImg.src}')`;
+                extBox.style.backgroundSize = `${bgWidth}px ${bgHeight}px`;
+                extBox.style.backgroundPosition = `-${ratioX * bgWidth - size / 2}px -${ratioY * bgHeight - size / 2}px`;
+            }
+        });
+
+        viewport.addEventListener('mouseleave', hideMagnifiers);
+
+        // --- 6. 核心闭环轮询机制（确保心跳永远不中断） ---
+        let pollTimer = null;
+        let isPolling = false;
+
+        async function fetchImageAndMeta() {
+            const targetPath = currentActiveImage ? encodeURIComponent(currentActiveImage) : '';
+            
+            // 1. 获取元数据
+            try {
+                const metaRes = await fetch(`/web_preview/meta/${targetPath}?t=` + Date.now());
+                if (metaRes.ok) {
+                    const data = await metaRes.json();
+                    
+                    if (data.status) progressStatusText.innerText = data.status;
+
+                    if (data.steps && typeof data.steps === 'string' && data.steps.includes('/')) {
+                        const parts = data.steps.split('/');
+                        const currentStep = parseInt(parts[0]);
+                        const totalStep = parseInt(parts[1]);
+                        const percent = Math.min(100, Math.round((currentStep / totalStep) * 100));
+
+                        progressBarFill.style.width = percent + '%';
+                        progressStepText.innerText = `${data.steps} (${percent}%)`;
+                    } else if (data.status === "Completed") {
+                        progressBarFill.style.width = '100%';
+                        progressStatusText.innerText = `✓ ${t('progress_completed')}`;
+                        progressStepText.innerText = '100%';
+                    }
+
+                    let badges = '';
+                    if (data.width && data.height) badges += `<div class="badge">${t('size')}: <b>${data.width} × ${data.height}</b></div>`;
+                    if (data.model_name) badges += `<div class="badge">${t('model')}: <b>${data.model_name}</b></div>`;
+                    if (data.seed && data.seed !== 'Auto') badges += `<div class="badge">${t('seed')}: <b>${data.seed}</b></div>`;
+                    if (data.steps && data.steps !== 'Auto') badges += `<div class="badge">${t('steps')}: <b>${data.steps}</b></div>`;
+                    if (data.cfg && data.cfg !== 'Auto') badges += `<div class="badge">${t('cfg')}: <b>${data.cfg}</b></div>`;
+                    if (data.sampler_name && data.sampler_name !== 'Auto') badges += `<div class="badge">${t('sampler')}: <b>${data.sampler_name}</b></div>`;
+                    if (data.scheduler) badges += `<div class="badge">${t('scheduler')}: <b>${data.scheduler}</b></div>`;
+                    document.getElementById('badgesContainer').innerHTML = badges;
+
+                    const posCard = document.getElementById('posCard');
+                    if (data.positive) {
+                        document.getElementById('posText').innerText = data.positive;
+                        posCard.style.display = 'block';
+                    } else posCard.style.display = 'none';
+
+                    const negCard = document.getElementById('negCard');
+                    if (data.negative) {
+                        document.getElementById('negText').innerText = data.negative;
+                        negCard.style.display = 'block';
+                    } else negCard.style.display = 'none';
+
+                    updateVisibility();
+                    applyCustomDimensions();
+                }
+            } catch (e) {}
+
+            // 2. 加载图片
+            return new Promise((resolve) => {
+                const tempImg = new Image();
+                tempImg.onload = function() {
+                    previewImg.src = this.src;
+                    previewImg.style.display = 'block';
+                    statusText.style.display = 'none';
+                    resolve();
+                };
+                tempImg.onerror = function() {
+                    if (!previewImg.src || previewImg.style.display === 'none') {
+                        statusText.style.display = 'block';
+                    }
+                    resolve();
+                };
+                tempImg.src = `/web_preview/image/${targetPath}?t=` + Date.now();
+            });
+        }
+
+        // 核心心跳调度器
+        async function heartBeat() {
+            if (isPolling) return;
+            isPolling = true;
+
+            try {
+                // 必须先同步一次槽位列表
+                await syncImageSlots();
+                // 请求图片与元数据
+                await fetchImageAndMeta();
+            } catch (err) {
+                console.error("Poll err:", err);
+            } finally {
+                isPolling = false;
+                scheduleNextBeat();
+            }
+        }
+
+        function scheduleNextBeat(delay = 1000) {
+            clearTimeout(pollTimer);
+            if (document.getElementById('autoRefreshToggle').checked) {
+                pollTimer = setTimeout(heartBeat, delay);
+            }
+        }
+
+        function triggerPollNow() {
+            clearTimeout(pollTimer);
+            heartBeat();
+        }
+
+        document.getElementById('manualRefreshBtn').addEventListener('click', triggerPollNow);
+        document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
+            if (e.target.checked) triggerPollNow();
+            else clearTimeout(pollTimer);
+        });
+
+        function copyPrompt(id) {
+            const text = document.getElementById(id).innerText;
+            const tEl = document.createElement("textarea");
+            tEl.value = text;
+            document.body.appendChild(tEl);
+            tEl.select();
+            document.execCommand('copy');
+            document.body.removeChild(tEl);
+            alert(t('copied'));
+        }
+        
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (!previewImg.src || previewImg.style.display === 'none') {
+                alert(t('no_image'));
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = previewImg.src;
+            a.download = `ComfyUI_${currentActiveImage || 'output'}_${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // 恢复持久化设置
+        if (localStorage.getItem('viewer_show_img') !== null) {
+            document.getElementById('showImageCheck').checked = localStorage.getItem('viewer_show_img') === 'true';
+        }
+        if (localStorage.getItem('viewer_show_meta') !== null) {
+            document.getElementById('showMetaCheck').checked = localStorage.getItem('viewer_show_meta') === 'true';
+        }
+        if (localStorage.getItem('viewer_show_progress') !== null) {
+            document.getElementById('showProgressCheck').checked = localStorage.getItem('viewer_show_progress') === 'true';
+        }
+        if (localStorage.getItem('viewer_mag_enabled') !== null) {
+            document.getElementById('magnifierCheck').checked = localStorage.getItem('viewer_mag_enabled') === 'true';
+        }
+        if (localStorage.getItem('viewer_mag_mode')) {
+            document.getElementById('magModeSelect').value = localStorage.getItem('viewer_mag_mode');
+        }
+        if (localStorage.getItem('viewer_mag_zoom')) {
+            document.getElementById('magnifierZoom').value = localStorage.getItem('viewer_mag_zoom');
+        }
+        if (localStorage.getItem('viewer_mag_size')) {
+            document.getElementById('magnifierSize').value = localStorage.getItem('viewer_mag_size');
+        }
+        if (localStorage.getItem('viewer_mag_offset_x')) {
+            document.getElementById('magOffsetX').value = localStorage.getItem('viewer_mag_offset_x');
+        }
+        if (localStorage.getItem('viewer_mag_offset_y')) {
+            document.getElementById('magOffsetY').value = localStorage.getItem('viewer_mag_offset_y');
+        }
+        if (localStorage.getItem('viewer_img_box_w')) {
+            document.getElementById('imgBoxWidth').value = localStorage.getItem('viewer_img_box_w');
+        }
+        if (localStorage.getItem('viewer_img_max_h')) {
+            document.getElementById('imgMaxHeight').value = localStorage.getItem('viewer_img_max_h');
+        }
+        if (localStorage.getItem('viewer_meta_box_w')) {
+            document.getElementById('metaBoxWidth').value = localStorage.getItem('viewer_meta_box_w');
+        }
+        if (localStorage.getItem('viewer_meta_font_size')) {
+            document.getElementById('metaFontSize').value = localStorage.getItem('viewer_meta_font_size');
+        }
+
+        applyCustomDimensions();
+        loadI18n(currentLang).then(() => {
+            heartBeat(); // 启动永不断线的轮询心跳
+        });
+    </script>
+</body>
+</html>
